@@ -6,4 +6,5 @@ beer_bot/*
 .idea/*
 __pycache__/*
 pyvenv.cfg
+beer_bot/*
 
