@@ -3,31 +3,42 @@ import pymysql
 import calendar
 from telebot import types
 from db import DataBase
+from user import User
 from config import TOKEN, TOKEN_TEST
 import datetime
 
+def isUser(id, users, message):
+    user_id = message.from_user.id
+    if id not in users:
+        users[id] = User(id)
+    return users[id]
 
 
 bot = telebot.TeleBot(TOKEN)
-db = DataBase('localhost', 'root', 'Morgretar2023', 'beer')
-info = {}
+db = DataBase('beer')
+'''info = {}'''
+users = {}
 admin = ['810885387']
 data = datetime.datetime.now()
-delivery_data = 0
+'''delivery_data = 0
 order = []
 quant = []
 addresses = []
 address = ""
-comment = ""
+comment = ""'''
 del_drink = set()
 write_downs = False
 month = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
          'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
-list_days = [str(i) for i in range(1, 13)]
+list_days = [str(i) for i in range(1, 32)]
 select_month = 0
 select_days = 0
 
+
+
 def add_type_drink(call):
+    telegram_id = call.from_user.id
+    user = users[telegram_id]
     buttons = types.InlineKeyboardMarkup()
     btn = []
     z = 1
@@ -37,7 +48,7 @@ def add_type_drink(call):
         z += 1
     buttons.add(*btn)
     bot.send_message(chat_id=call.message.chat.id, text="Выберите сорт", reply_markup=buttons)
-    info['type'] = call.data
+    user.info['type'] = call.data
 
 """def del_drink(call):
     return call.message"""
@@ -61,19 +72,16 @@ def start_message(message):
 
 @bot.message_handler(content_types=['text'])
 def get_name_drinks(message):
-    global order
-    global info
-    global quant
-    global addresses
-    global comment
     global write_downs
     global del_drink
-    global delivery_data
     global data
     global select_month
     global select_days
+    user_id = message.from_user.id
+    if user_id not in users:
+        users[user_id] = User(user_id)
+    user = users[user_id]
 
-    #user_id = message.from_user.id
     if message.text == "Заказ":
         buttons = types.InlineKeyboardMarkup()
         for i in db.get_address():
@@ -101,7 +109,6 @@ def get_name_drinks(message):
         button_comment = types.KeyboardButton("Комментарий")
         button_go = types.KeyboardButton("Подтвердить")
         buttons.add(button_drinks, button_comment, button_go)
-
         bot.send_message(message.chat.id, "Если требуется добавить что-либо чего нет в списке, или оставить комментарий - жми Комментарий, либо Добавить", reply_markup=buttons)
     elif message.text == "Комментарий":
         buttons = types.ReplyKeyboardMarkup(resize_keyboard=True)
@@ -118,7 +125,7 @@ def get_name_drinks(message):
         bot.send_message(message.chat.id, text="Выберите категорию напитков", reply_markup=buttons)
     elif message.text == "Удалить":
         buttons = types.InlineKeyboardMarkup()
-        for i in order:
+        for i in user.order:
             button = types.InlineKeyboardButton("Удалить " + i, callback_data="Удалить " + i)
             buttons.add(button)
             del_drink.add("Удалить " + i)
@@ -126,7 +133,7 @@ def get_name_drinks(message):
     elif message.text == "Подтвердить":
         b = ""
         a = 0
-        for (i, q) in zip(order, quant):
+        for (i, q) in zip(user.order, user.quant):
             a += 1
             b += f"{a}) {i} в количестве: {q} \n"
         buttons = types.ReplyKeyboardMarkup(resize_keyboard=True)
@@ -137,7 +144,8 @@ def get_name_drinks(message):
         button_go = types.KeyboardButton("Отправить на доставку")
         buttons.add(button_replace, button_add, button_data, button_comment, button_go)
         bot.send_message(message.chat.id, text="Заказ принят, скоро его начнут собирать")
-        bot.send_message(message.chat.id, f"<b>Вы заказали</b> \n\n{b} на адрес {address} \n\n <b>Комментарий</b> \n\n {comment} \n\n Всё верно?",
+        bot.send_message(message.chat.id, f"<b>Вы заказали</b> \n\n{b} на адрес {user.address} \n\n <b>Комментарий</b>"
+                                          f" \n\n {user.comment} \n\n Всё верно?",
                              parse_mode='HTML', reply_markup=buttons)
     elif message.text == "Дата доставки":
         buttons = types.InlineKeyboardMarkup(row_width=4)
@@ -149,17 +157,17 @@ def get_name_drinks(message):
         bot.send_message(message.chat.id, "Выберите месяц", reply_markup=buttons)
     elif message.text == "Отправить на доставку":
         if select_days == 0 and select_month == 0:
-            delivery_data = data + datetime.timedelta(days=+1)
+            user.delivery_data = data + datetime.timedelta(days=+1)
         else:
-            delivery_data = f"{select_days} {select_month} {data.year}"
-            delivery_data = datetime.datetime.strptime(delivery_data, '%d %m %Y')
+            user.delivery_data = f"{select_days} {select_month} {data.year}"
+            user.delivery_data = datetime.datetime.strptime(user.delivery_data, '%d %m %Y')
         b = ""
         c = 0
         a = 0
-        for (i, q) in zip(order, quant):
+        for (i, q) in zip(user.order, user.quant):
             a += 1
             b += f"{a}) {i} в количестве: {q} \n"
-            db.insert_order(address, i, q)
+            db.insert_order(user.address, i, q)
             db.minus_drink(i, q)
             c += 1
         buttons = types.ReplyKeyboardMarkup(resize_keyboard=True)
@@ -168,28 +176,29 @@ def get_name_drinks(message):
         button_repair = types.KeyboardButton("Ремонт")
         button_help = types.KeyboardButton("Помощь")
         buttons.add(button_drinks, button_util, button_repair, button_help)
-        bot.send_message(message.chat.id, text=f"Заказ принят, скоро его начнут собирать, ожидаемая дата доставки: {delivery_data.strftime('%d.%m')} до 19:00")
-        bot.send_message(admin[0], f"<b>Заказали</b> \n\n{b} на адрес {address} \n\n <b>Комментарий</b> \n\n {comment} \n\n Доставка на {delivery_data.strftime('%d.%m')}", parse_mode='HTML', reply_markup=buttons)
-        order = []
-        quant = []
-        addresses = []
+        bot.send_message(message.chat.id, text=f"Заказ принят, скоро его начнут собирать, ожидаемая дата доставки: {user.delivery_data.strftime('%d.%m')} до 19:00")
+        bot.send_message(admin[0], f"<b>Заказали \nНа адрес {user.address} \n\n</b> \n\n{b} \n\n <b>Комментарий</b> \n\n {user.comment} \n\n Доставка на {user.delivery_data.strftime('%d.%m')}", parse_mode='HTML', reply_markup=buttons)
+        user.order = []
+        user.quant = []
+        user.addresses = []
         select_month = 0
         select_days = 0
         data = datetime.datetime.now()
-        delivery_data = data + datetime.timedelta(days=+1)
+        user.delivery_data = data + datetime.timedelta(days=+1)
 
 
 
 
 @bot.callback_query_handler(func=lambda call:True)
 def get_drink(call):
-    global address
+    telegram_id = call.from_user.id
+    user = users[telegram_id]
     global write_downs
     global del_drink
     global select_month
     global select_days
     if call.data in db.get_address():
-        address = call.data
+        user.address = call.data
         buttons = types.InlineKeyboardMarkup()
         for i in db.get_type_drink():
             button = types.InlineKeyboardButton(i, callback_data=i)
@@ -210,10 +219,10 @@ def get_drink(call):
         drink = call.data[8:]
         key = 0
         print(drink)
-        for i in order:
+        for i in user.order:
             if i == drink:
-                del order[key]
-                del quant[key]
+                del user.order[key]
+                del user.quant[key]
                 del_drink = set()
                 break
             key += 1
@@ -246,17 +255,18 @@ def get_drink(call):
 
         bot.send_message(chat_id=call.message.chat.id, text="Если требуется добавить что-либо чего нет в списке, или оставить комментарий - жми Комментарий, либо Добавить",
                          reply_markup=buttons)
-    elif call.data in db.get_drink(info['type']):
+    elif call.data in db.get_drink(user.info['type']):
         bot.send_message(chat_id=call.message.chat.id, text=f"Введите количество")
-        info['drink'] = call.data
+        user.info['drink'] = call.data
         if write_downs:
             bot.register_next_step_handler(call.message, get_write_downs)
         elif not write_downs:
             bot.register_next_step_handler(call.message, get_quantity)
 
 def get_date(message):
-    global delivery_data
-    delivery_data = message.text
+    telegram_id = message.from_user.id
+    user = users[telegram_id]
+    user.delivery_data = message.text
     bot.send_message(message.chat.id, "Дата принята")
     buttons = types.ReplyKeyboardMarkup(resize_keyboard=True)
     button_add = types.KeyboardButton("Добавить")
@@ -265,24 +275,24 @@ def get_date(message):
     buttons.add(button_add, button_comment, button_go)
 
 def get_quantity(message):
-    global order
-    global quant
-    info['quantity'] = message.text
+    telegram_id = message.from_user.id
+    user = users[telegram_id]
+    user.info['quantity'] = message.text
     buttons = types.ReplyKeyboardMarkup(resize_keyboard=True)
     button_drinks = types.KeyboardButton("Добавить")
     button_comment = types.KeyboardButton("Комментарий")
     button_go = types.KeyboardButton("Подтвердить")
     buttons.add(button_drinks, button_comment, button_go)
     bot.send_message(chat_id=message.chat.id,
-                     text=f"Заказано {info['drink']} в количестве {info['quantity']}",
+                     text=f"Заказано {user.info['drink']} в количестве {user.info['quantity']}",
                      reply_markup=buttons)
-    order.append(f"{info['drink']}")
-    quant.append(f"{info['quantity']}")
+    user.order.append(f"{user.info['drink']}")
+    user.quant.append(f"{user.info['quantity']}")
 
 def get_write_downs(message):
-    global order
-    global quant
-    info['quantity'] = message.text
+    telegram_id = message.from_user.id
+    user = users[telegram_id]
+    user.info['quantity'] = message.text
     buttons = types.ReplyKeyboardMarkup(resize_keyboard=True)
     button_drinks = types.KeyboardButton("Заказ")
     button_util = types.KeyboardButton("Списание")
@@ -290,13 +300,12 @@ def get_write_downs(message):
     button_help = types.KeyboardButton("Помощь")
     buttons.add(button_drinks, button_util, button_repair, button_help)
     bot.send_message(chat_id=message.chat.id,
-                     text=f"Списываю {info['drink']} в количестве {info['quantity']} с адреса {address}, готово!",
+                     text=f"Списываю {user.info['drink']} в количестве {user.info['quantity']} с адреса {user.address}, готово!",
                      reply_markup=buttons)
 
 
 @bot.message_handler(content_types=['photo'])
 def get_photo(message):
-    #msg = bot.send_message(message.chat.id, "Оставьте комментарий к фото")
     bot.send_photo(admin[0], message.photo[0].file_id)
     bot.send_message(admin[0], message.caption)
     bot.send_message(message.chat.id, "Добавили поломку в работу")
@@ -307,12 +316,15 @@ def get_photo(message):
     button_help = types.KeyboardButton("Помощь")
     buttons.add(button_drinks, button_util, button_repair, button_help)
     bot.send_message(message.chat.id,
-                     "Проследуй в меню, изучи, сделай заказ. Если что-то пойдет не так или потребуется помощь то ты всегда можешь написать Помощь",
+                     "Проследуй в меню, изучи, сделай заказ. Если что-то пойдет не так или потребуется помощь то ты "
+                     "всегда можешь написать Помощь",
                      reply_markup=buttons)
 
+    
 def test(message):
-    global comment
-    comment = message.text
+    telegram_id = message.from_user.id
+    user = users[telegram_id]
+    user.comment = message.text
     buttons = types.ReplyKeyboardMarkup(resize_keyboard=True)
     button_go = types.KeyboardButton("Отправить на доставку")
     buttons.add(button_go)

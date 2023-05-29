@@ -1,24 +1,27 @@
+import sqlite3
+
 import pymysql
 
 
 class DataBase:
-    def __init__(self, host, user, password, db):
-        self.con = pymysql.connect(host=host,
+    def __init__(self, db):
+        self.con = sqlite3.connect(db, check_same_thread=False)
+        self.cur = self.con.cursor()
+        """self.con = pymysql.connect(host=host,
                               user=user,
                               password=password,
                               db=db,
-                              )
+                              )"""
 
     def get_type_drink(self):
-        with self.con.cursor() as cur:
-            type_of_drink = []
-            cur.execute("select name from type_of_drink")
-            result = cur.fetchall()
-            for drink in result:
-                for i in drink:
-                   type_of_drink.append(str(i))
-            cur.close()
-            return type_of_drink
+        type_of_drink = []
+        self.cur.execute("select name from type_of_drink")
+        result = self.cur.fetchall()
+        for drink in result:
+            for i in drink:
+               type_of_drink.append(str(i))
+           # cur.close()
+        return type_of_drink
 
     def get_drink(self, type):
         cur = self.con.cursor()
@@ -28,7 +31,7 @@ class DataBase:
         for drink in result:
             for i in drink:
                 drinks.append(str(i))
-        cur.close()
+        #cur.close()
         return drinks
 
     def get_consumables(self, type):
@@ -39,7 +42,7 @@ class DataBase:
         for drink in result:
             for i in drink:
                 drinks.append(str(i))
-        cur.close()
+        #cur.close()
         return drinks
 
     def get_all_drink(self):
@@ -50,7 +53,7 @@ class DataBase:
         for drink in result:
             for i in drink:
                 drinks.append(str(i))
-        cur.close()
+        #cur.close()
         return drinks
 
     def get_name_drink_and_quantity(self):
@@ -61,7 +64,7 @@ class DataBase:
         for drink in result:
             for i in drink:
                 drinks.append(str(i))
-        cur.close()
+        #cur.close()
         return drinks
 
     def get_address(self):
@@ -72,7 +75,7 @@ class DataBase:
         for addresse in result:
             for i in addresse:
                 addresses.append(str(i))
-        cur.close()
+       # cur.close()
         return addresses
 
 
@@ -92,19 +95,19 @@ class DataBase:
                 drinks.append(i)
         cur.execute(f"insert into orders (id_bar, id_name_drink, quantity) values ({bars[0]}, {drinks[0]}, {quantity})")
         self.con.commit()
-        cur.close()
+       # cur.close()
 
     def insert_drink(self, name, quantity):
         cur = self.con.cursor()
         cur.execute(f"update name_drink set quantity = quantity + {quantity} where name = '{name}'")
         self.con.commit()
-        cur.close()
+        #cur.close()
 
     def minus_drink(self, name, quantity):
         cur = self.con.cursor()
         cur.execute(f"update name_drink set quantity = quantity - {quantity} where name = '{name}'")
         self.con.commit()
-        cur.close()
+        #cur.close()
 
     def get_orders(self):
         info = []
@@ -112,7 +115,7 @@ class DataBase:
         cur.execute("select * from orders")
         for result in cur.fetchall():
             info.append(result)
-        cur.close()
+        #cur.close()
         return info
 
 
